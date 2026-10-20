@@ -307,6 +307,6 @@ Released under the [MIT License](LICENSE). See `LICENSE` for details.
 **Phantoms** · Team ID `VTU-QFF-HC-0005` · Tier `Online`
 · Built with ⚛️ Qiskit for the VTU-QFF Hackathon
 
-[⬆ Back to Top](#Phantoms)
+[⬆ Back to Top](#phantoms)
 
 </div>
