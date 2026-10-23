@@ -1,8 +1,8 @@
 <div align="center">
 
-# Phantoms
+# Drift-Aware Industrial Fault Detection Using Hybrid Quantum–Classical Machine Learning
 
-**VTU-QFF-HC-0005** &nbsp;|&nbsp; Tier: **Online**
+**Team:** Phantoms &nbsp;|&nbsp; **Team ID:** VTU-QFF-HC-0005 &nbsp;|&nbsp; **Track:** Quantum + AI/ML
 
 </div>
 
@@ -14,7 +14,7 @@
 | :--- | :--- |
 | **Team** | Phantoms |
 | **Team ID** | VTU-QFF-HC-0005 |
-| **Tier** | Online |
+| **Track** | Quantum + AI/ML |
 | **Repository** | [vtu-hc-phantoms](https://github.com/vtu-qiskit-fall-fest-2026/vtu-hc-phantoms.git) |
 | **Organisation** | [vtu-qiskit-fall-fest-2026](https://github.com/vtu-qiskit-fall-fest-2026) |
 | **Event** | VTU-QFF Hackathon — VTU-Qiskit Fall Fest 2026 |
@@ -25,89 +25,84 @@
 
 ## 📌 Table of Contents
 
-- [Team Members](#-team-members-github-ids)
-- [Problem Statement](#-problem-statement)
-- [Proposed Solution](#-proposed-solution)
+- [Project Overview & Problem Statement](#-problem-statement)
+- [Proposed Solution & Roadmap](#-proposed-solution)
+- [Dataset Setup & Leakage Prevention](#-dataset-setup--leakage-prevention)
 - [Approach & Architecture](#-approach--architecture)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
-- [How to Run](#-how-to-run)
-- [How to Push Code](#-how-to-push-code)
-- [Submission Checklist](#-submission-checklist)
-- [Resources](#-resources)
+- [How to Run Baseline & Tests](#-how-to-run)
 - [License](#-license)
-
----
-
-## 👥 Team Members (GitHub IDs)
-
-> Members are added to this repository as **collaborators** and must accept the
-> GitHub invitation before they can push. Add your GitHub username below.
-
-| # | Name | GitHub Username | Role |
-| :-- | :--- | :--- | :--- |
-| 1 | _Add your name_ | _your-github-username_ | _Team Lead_ |
-| 2 | _Add your name_ | _your-github-username_ | _Developer_ |
-| 3 | _Add your name_ | _your-github-username_ | _Developer_ |
-
-<!--
-Optional: add a plain list instead of the table above.
-- @username1
-- @username2
--->
 
 ---
 
 ## ❓ Problem Statement
 
-<!--
-State the problem you are solving. Be specific: what is broken or missing,
-who experiences it, and why does it matter. Link to the official problem
-statement from the brief if one applies.
--->
+Industrial fault-detection systems can become unreliable when sensor readings drift over time (due to machine wear, temperature shifts, or recalibration errors) or when labelled fault data is limited. Traditional machine learning models often experience significant performance degradation under distribution shift without alerting human operators.
 
-**Problem:** _Describe the problem in 2–3 sentences._
+**Why it matters:** In safety-critical sectors (manufacturing, aerospace, energy), missed faults lead to catastrophic downtime, while uncalibrated alerts overwhelm operators.
 
-**Why it matters:** _Explain the impact or opportunity._
-
-**Track / Category:** _Online / Offline · Track 1 / Track 2 · <domain>_
+**Track:** Quantum + AI/ML
 
 ---
 
 ## 💡 Proposed Solution
 
-<!--
-Describe your solution. Keep it concrete: the core idea, the user flow, and
-the quantum/ML technique you are applying.
--->
+We investigate a hybrid quantum–classical machine learning framework that compares a classical Support Vector Machine (SVM) baseline with a simulated quantum-kernel classifier under controlled sensor drift. The system integrates early sensor drift warnings and uncertainty-aware alerts to flag potentially unreliable predictions for human review.
 
-**Solution:** _In 2–3 sentences, describe what you built._
+> [!NOTE]
+> **Implementation Status: Phase 2 Completed (Classical Baseline)**
+> - [x] **Phase 1: Workspace Scaffolding**: Modular directory structure, repository config, and dependency setup.
+> - [x] **Phase 2: Data Loader & Classical Baseline**: Ingestion of UCI AI4I 2020 dataset, leakage-free preprocessing, class-imbalanced RBF-SVM training and evaluation.
+> - [ ] **Phase 3: Quantum Kernel Classifier** *(Planned)*: Quantum feature maps (e.g., `ZZFeatureMap`) and `FidelityQuantumKernel` on `AerSimulator`. No quantum advantage is claimed.
+> - [ ] **Phase 4: Drift Detection & Uncertainty Alerting** *(Planned)*: Statistical distribution-shift monitoring and human-in-the-loop review alerts.
 
-**Key idea:** _The one-line technical summary of your approach._
+---
 
-**Why this works:** _How your approach addresses the problem statement._
+## 📊 Dataset Setup & Leakage Prevention
+
+The project uses the **UCI AI4I 2020 Predictive Maintenance Dataset** (UCI ID `601`), containing 10,000 operational records of synthetic milling machine telemetry.
+
+### 1. Ingestion
+The dataset is retrieved automatically via `ucimlrepo` and cached locally to `data/ai4i2020.csv` on first run:
+```bash
+python -m src.main
+```
+
+### 2. Feature Selection & Leakage Prevention
+To ensure realistic predictive maintenance modeling without target leakage:
+- **Included Features:**
+  - `Type`: Product quality variant (`L`, `M`, `H`) — one-hot encoded
+  - `Air temperature [K]`
+  - `Process temperature [K]`
+  - `Rotational speed [rpm]`
+  - `Torque [Nm]`
+  - `Tool wear [min]`
+- **Excluded Columns (Leakage Prevention):**
+  - Failure mode indicators (`TWF`, `HDF`, `PWF`, `OSF`, `RNF`): Component-level breakdown causes that directly reveal machine failure.
+- **Target Variable:**
+  - `Machine failure`: Binary indicator (`0` = normal, `1` = failure).
+
+### 3. Handling Class Imbalance
+The dataset contains only **3.39% failure instances** (339 failure records vs 9,661 normal records). To handle this without introducing synthetic interpolation noise in sensor space:
+- We employ stratified train/test splitting (`test_size=0.2`, `stratify=y`).
+- The Support Vector Classifier is configured with `class_weight='balanced'`, which penalizes minority class (failure) misclassifications inversely proportional to class frequencies:
+  $$\omega_j = \frac{n}{k \cdot n_j}$$
+  This significantly improves failure recall without data duplication.
 
 ---
 
 ## 🧩 Approach & Architecture
 
-<!--
-Walk through how it works. A simple pipeline diagram in text or Mermaid is ideal.
--->
-
 ```mermaid
 flowchart LR
-    A[Input Data] --> B[Preprocessing]
-    B --> C[Quantum Circuit / Model]
-    C --> D[Post-processing]
-    D --> E[Output]
+    A["Raw AI4I Sensor Data"] --> B["Leakage-Free Filter (Excl. Failure Modes)"]
+    B --> C["Preprocessing (StandardScaler + OneHotEncoder)"]
+    C --> D["Classical SVM Pipeline (class_weight='balanced')"]
+    D --> E["Evaluation (Precision, Recall, F1, Confusion Matrix)"]
+    C -. Planned .-> F["Quantum Kernel Classifier (ZZFeatureMap)"]
+    C -. Planned .-> G["Drift Detector (Statistical MMD)"]
 ```
-
-1. **Input** — _what data goes in and in what format_
-2. **Preprocessing** — _cleaning, feature extraction, encoding_
-3. **Quantum core** — _the circuit, ansatz, or algorithm used_
-4. **Post-processing** — _decoding, measurement, scoring_
-5. **Output** — _what the user finally gets_
 
 ---
 
@@ -115,184 +110,69 @@ flowchart LR
 
 | Layer | Technology |
 | :--- | :--- |
-| Language | Python 3.11+ |
-| Quantum SDK | Qiskit `>=1.0`, Qiskit Aer, Qiskit Runtime |
-| Optimisation | Qiskit Optimization / COBYLA / SPSA |
-| Simulation | AerSimulator (statevector / noisemodel) |
-| Environment | JupyterLab / VS Code, `venv` |
-| Version control | Git + GitHub |
+| Language | Python 3.10+ |
+| Classical ML | `scikit-learn`, `numpy`, `pandas`, `matplotlib` |
+| Dataset Source | `ucimlrepo` (UCI AI4I 2020 ID: 601) |
+| Quantum SDK *(Planned)* | `qiskit`, `qiskit-machine-learning`, `qiskit-aer` |
+| Testing | Python standard `unittest` / `pytest` |
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-vtu-hc-phantoms/
-├── README.md              # This file
-├── requirements.txt       # Python dependencies
-├── pyproject.toml         # Project metadata (optional)
-├── .gitignore
-├── notebooks/             # Jupyter notebooks for experiments
-│   └── exploration.ipynb
+Quantum/
 ├── src/
-│   ├── __init__.py
-│   ├── circuit.py         # Quantum circuit construction
-│   ├── optimizer.py       # Optimization loop
-│   └── main.py            # Entry point
-├── data/                  # Datasets (use Git LFS for large files)
-├── tests/                 # Unit tests
-│   └── test_circuit.py
-└── docs/                  # Notes, diagrams, reports
+│   ├── __init__.py           # Package initializer
+│   ├── data_loader.py        # Dataset fetching, caching, and leakage-safe extraction
+│   ├── classical_model.py    # Preprocessor and balanced Classical SVM pipeline
+│   ├── quantum_model.py      # Quantum feature maps & kernel estimators (Planned)
+│   ├── drift_detector.py     # Statistical drift detection heuristics (Planned)
+│   ├── uncertainty.py        # Uncertainty quantification & human-review alerts (Planned)
+│   └── main.py               # Main pipeline orchestration and evaluation report
+├── data/
+│   └── .gitkeep              # Data storage directory placeholder
+├── tests/
+│   └── test_project.py       # Unit and integration test suite
+├── requirements.txt          # Python dependencies
+├── README.md                 # Project documentation
+└── .gitignore                # Git ignore patterns
 ```
 
 ---
 
 ## 🚀 How to Run
 
-### Prerequisites
+### 1. Environment Setup
 
-- Python 3.11 or newer
-- [Git](https://git-scm.com/downloads)
-- A GitHub account (you need collaborator access to this repo)
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/vtu-qiskit-fall-fest-2026/vtu-hc-phantoms.git
-cd vtu-hc-phantoms
+Ensure your virtual environment is active:
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-### 2. Create a virtual environment
-
+Install dependencies:
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate        # Linux / macOS
-# .venv\Scripts\activate         # Windows (PowerShell)
-```
-
-### 3. Install dependencies
-
-```bash
-pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Run
+### 2. Run the Classical Baseline
 
+Execute the end-to-end pipeline:
 ```bash
 python -m src.main
 ```
+This will:
+1. Fetch and cache the AI4I 2020 dataset to `data/ai4i2020.csv`.
+2. Clean features and exclude leakage columns.
+3. Fit the balanced classical RBF-SVM pipeline.
+4. Output the complete classification report and confusion matrix.
 
-Or launch the notebook workflow:
+### 3. Run the Automated Tests
 
+Execute the unit test suite:
 ```bash
-jupyter lab
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
-
-### 5. Run the tests
-
-```bash
-pytest -q
-```
-
----
-
-## 🔁 How to Push Code
-
-> Full walkthrough: **[Git & Collaboration Handbook](../vtu-hc-guide-git-and-collaboration)** — collaboration
-> workflow, branches, pull requests, reviews and conflict resolution.
-
-### Configure Git (first time only)
-
-```bash
-git config --global user.name  "Your Name"
-git config --global user.email "you@example.com"
-```
-
-### Everyday workflow
-
-```bash
-# 1. Get the latest changes
-git checkout main
-git pull origin main
-
-# 2. Create a branch for your work
-git checkout -b feature/my-task
-
-# 3. Commit your work
-git add .
-git commit -m "feat: add variational circuit for the search problem"
-
-# 4. Push the branch
-git push -u origin feature/my-task
-
-# 5. Open a Pull Request on GitHub and request a review
-#    https://github.com/vtu-qiskit-fall-fest-2026/vtu-hc-phantoms/compare/main...feature/my-task
-
-# 6. After approval, merge into main
-git checkout main
-git pull origin main
-git branch -d feature/my-task
-```
-
-### Commit message convention
-
-| Prefix | Meaning |
-| :--- | :--- |
-| `feat:` | New feature |
-| `fix:` | Bug fix |
-| `docs:` | Documentation only |
-| `test:` | Adding or fixing tests |
-| `refactor:` | Code restructure, no behaviour change |
-| `chore:` | Build/config/dependency changes |
-
-### Useful commands
-
-```bash
-git status              # what changed
-git log --oneline -10   # recent commits
-git diff                # review changes before committing
-git stash               # shelve changes temporarily
-git pull --rebase       # update your branch on top of main
-```
-
-### Collaborating on the same repo
-
-- **Never push directly to `main`** — open a Pull Request.
-- **Pull before you push** to avoid rejected commits.
-- **Commit often** with clear messages.
-- **Resolve conflicts** locally: `git pull --rebase`, fix the files, then `git add` + `git rebase --continue`.
-- **Ask for a review** before merging — a second pair of eyes catches bugs fast.
-
----
-
-## ✅ Submission Checklist
-
-- [ ] Repository created and **public**
-- [ ] All team members added as **collaborators** and invitations accepted
-- [ ] `README.md` updated with project details, problem statement and solution
-- [ ] Team members listed under [Team Members](#-team-members-github-ids)
-- [ ] `requirements.txt` committed and project runs from a clean clone
-- [ ] Code pushed to `main` and the latest `main` builds successfully
-- [ ] Notebooks committed with **cleared outputs** (or use `nbstrip`)
-- [ ] `README` includes a demo screenshot / video link
-- [ ] Short project summary submitted on the hackathon portal
-
----
-
-## 📚 Resources
-
-| Resource | Link |
-| :--- | :--- |
-| 🔁 Git & collaboration handbook | [Git & Collaboration Handbook](../vtu-hc-guide-git-and-collaboration) |
-| ❓ Problem statements, solutions & terms | [Problem Statements, Solutions & Terms](../vtu-hc-guide-problem-and-solution) |
-| 📄 README writing guide | [README Guide & Template](../vtu-hc-guide-readme-template) |
-| ⚛️ Qiskit documentation | https://docs.quantum.ibm.com/ |
-| ⚛️ Qiskit Runtime & primitives | https://quantum.cloud.ibm.com/docs/ |
-| 🧪 Qiskit Aer simulator | https://docs.quantum.ibm.com/guides/simulator |
-| 💻 IBM Quantum Platform | https://quantum.cloud.ibm.com/ |
-| 🎓 Qiskit textbook | https://qiskit.qotlabs.org/learning/ |
-| 📋 GitHub Docs | https://docs.github.com/ |
 
 ---
 
@@ -304,9 +184,6 @@ Released under the [MIT License](LICENSE). See `LICENSE` for details.
 
 <div align="center">
 
-**Phantoms** · Team ID `VTU-QFF-HC-0005` · Tier `Online`
-· Built with ⚛️ Qiskit for the VTU-QFF Hackathon
-
-[⬆ Back to Top](#phantoms)
+**Phantoms** · Team ID `VTU-QFF-HC-0005` · Built for the VTU-QFF Hackathon
 
 </div>
