@@ -26,13 +26,15 @@
 ## 📌 Table of Contents
 
 - [Project Overview & Problem Statement](#-problem-statement)
-- [Proposed Solution & Roadmap](#-proposed-solution)
+- [Proposed Solution & Roadmap](#-proposed-solution--roadmap)
 - [Dataset Setup & Leakage Prevention](#-dataset-setup--leakage-prevention)
 - [Classical vs. Quantum Methodology](#-classical-vs-quantum-methodology)
+- [Sensor Drift Detection (Two-Sample KS Test)](#-sensor-drift-detection-two-sample-ks-test)
+- [Uncertainty-Aware Alerting Layer](#-uncertainty-aware-alerting-layer)
 - [Approach & Architecture](#-approach--architecture)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
-- [How to Run Baseline & Quantum Experiments](#-how-to-run)
+- [How to Run Baseline, Quantum, and Drift Demos](#-how-to-run)
 - [Automated Tests](#-automated-tests)
 - [License](#-license)
 
@@ -40,9 +42,9 @@
 
 ## ❓ Problem Statement
 
-Industrial fault-detection systems can become unreliable when sensor readings drift over time (due to machine wear, temperature shifts, or recalibration errors) or when labelled fault data is limited. Traditional machine learning models often experience significant performance degradation under distribution shift without alerting human operators.
+Industrial fault-detection systems can become unreliable when sensor readings drift over time (due to machine wear, ambient thermal changes, or sensor decalibration) or when labelled fault data is limited. Traditional machine learning models often experience significant performance degradation under distribution shift without alerting human operators.
 
-**Why it matters:** In safety-critical sectors (manufacturing, aerospace, energy), missed faults lead to catastrophic downtime, while uncalibrated alerts overwhelm operators.
+**Why it matters:** In safety-critical sectors (manufacturing, aerospace, energy), silent failure under distribution shift leads to catastrophic downtime, while uncalibrated alerts overwhelm operators with false alarms.
 
 **Track:** Quantum + AI/ML
 
@@ -50,14 +52,14 @@ Industrial fault-detection systems can become unreliable when sensor readings dr
 
 ## 💡 Proposed Solution & Roadmap
 
-We investigate a hybrid quantum–classical machine learning framework that compares a classical Support Vector Machine (SVM) baseline with a simulated quantum-kernel classifier under controlled conditions. The roadmap incorporates early sensor drift warnings and uncertainty-aware alerts to flag potentially unreliable predictions for human review.
+We investigate a hybrid quantum–classical machine learning framework that compares a classical Support Vector Machine (SVM) baseline with a simulated quantum-kernel classifier under controlled conditions. The pipeline incorporates early sensor drift warnings and uncertainty-aware alerts to flag potentially unreliable predictions for human review.
 
 > [!NOTE]
-> **Implementation Status: Phase 3 Completed (Quantum-Kernel SVM & Benchmark)**
+> **Implementation Status: Phase 4 Completed (End-to-End Pipeline)**
 > - [x] **Phase 1: Workspace Scaffolding**: Modular directory structure, repository config, and dependency setup.
 > - [x] **Phase 2: Data Loader & Classical Baseline**: Ingestion of UCI AI4I 2020 dataset, leakage-free preprocessing, class-imbalanced RBF-SVM training and evaluation on 10,000 samples.
 > - [x] **Phase 3: Quantum-Kernel Classifier & Head-to-Head Benchmark**: Implemented `QuantumKernelClassifier` with Qiskit `zz_feature_map` and `FidelityQuantumKernel` on `Statevector` simulation; constructed a controlled, reproducible stratified comparison benchmark.
-> - [ ] **Phase 4: Drift Detection & Uncertainty Alerting** *(Planned)*: Statistical distribution-shift monitoring and human-in-the-loop review alerts.
+> - [x] **Phase 4: Drift Detection & Uncertainty Alerting**: Statistical two-sample Kolmogorov–Smirnov distribution-shift detector and uncertainty-aware human review alerting layer.
 
 ---
 
@@ -87,7 +89,7 @@ To ensure realistic predictive maintenance modeling without target leakage:
 
 ### 3. Handling Class Imbalance
 The dataset contains only **3.39% failure instances** (339 failure records vs 9,661 normal records).
-- Stratified splitting maintains class proportions.
+- Stratified splitting maintains class proportions across train and test sets.
 - All classifiers configure `class_weight='balanced'`, penalizing failure misclassifications inversely proportional to class frequencies.
 
 ---
@@ -121,6 +123,26 @@ To enable fair and tractable experiments:
 
 ---
 
+## 📡 Sensor Drift Detection (Two-Sample KS Test)
+
+The `SensorDriftDetector` ([`src/drift_detector.py`](src/drift_detector.py)) monitors statistical distribution shifts between a reference healthy baseline (e.g. training data) and batches of incoming sensor readings:
+- **Method:** Two-sample Kolmogorov–Smirnov test (`scipy.stats.ks_2samp`) applied to each continuous sensor dimension.
+- **Thresholding:** Configurable significance level $\alpha$ (default `0.05`). A batch feature with $p < \alpha$ raises a drift alert.
+- **Safe Handling:** Supports small batches with sample-size warnings, constant features, and missing values.
+- **Target Independence:** Evaluates distribution shifts purely on unlabeled sensor telemetry without accessing failure labels.
+- **Distinction Notice:** Evidence of drift reflects input distribution shift (covariate shift), not definitive machine failure.
+
+---
+
+## 🛡️ Uncertainty-Aware Alerting Layer
+
+The `UncertaintyAlertLayer` ([`src/uncertainty.py`](src/uncertainty.py)) monitors prediction decisiveness:
+- **Mechanism:** Evaluates maximum class probability against a configurable threshold (e.g., `confidence_threshold=0.70`).
+- **Human-in-the-Loop Review:** Borderline predictions where the model's confidence is degraded or ambiguous ($< 70\%$) are automatically flagged for human operator review.
+- **Limitation Notice:** Platt-scaled probabilities from SVMs (`SVC(probability=True)`) are heuristic cross-validation mappings. They are not guaranteed Bayesian posteriors under covariate shift. Confidence measures model decisiveness, not absolute correctness.
+
+---
+
 ## 🧩 Approach & Architecture
 
 ```mermaid
@@ -144,6 +166,13 @@ flowchart TD
         H2 --> I2["Model B: Quantum-Kernel SVM"]
         F2 & I2 --> J2["Head-to-Head Evaluation Report"]
     end
+
+    subgraph Drift & Uncertainty Layer
+        C1 --> K1["SensorDriftDetector (Two-Sample KS-Test)"]
+        K1 --> L1["Early Drift Warning (Covariate Shift)"]
+        E1 --> M1["UncertaintyAlertLayer (Confidence < 70%)"]
+        M1 --> N1["Human-in-the-Loop Operator Review Alert"]
+    end
 ```
 
 ---
@@ -153,7 +182,7 @@ flowchart TD
 | Layer | Technology |
 | :--- | :--- |
 | Language | Python 3.10+ |
-| Classical ML | `scikit-learn`, `numpy`, `pandas`, `matplotlib` |
+| Classical ML & Stats | `scikit-learn`, `scipy`, `numpy`, `pandas`, `matplotlib` |
 | Dataset Source | `ucimlrepo` (UCI AI4I 2020 ID: 601) |
 | Quantum SDK | `qiskit>=1.0`, `qiskit-machine-learning`, `qiskit-aer` |
 | Testing | Python standard `unittest` / `pytest` |
@@ -169,13 +198,13 @@ Quantum/
 │   ├── data_loader.py        # Dataset loading, caching, and leakage-safe extraction
 │   ├── classical_model.py    # Preprocessor and balanced Classical SVM pipeline
 │   ├── quantum_model.py      # Quantum feature maps, quantum kernel, and subset extractor
-│   ├── drift_detector.py     # Statistical drift detection heuristics (Planned)
-│   ├── uncertainty.py        # Uncertainty quantification & human-review alerts (Planned)
-│   └── main.py               # Full baseline + Head-to-head quantum comparison pipeline
+│   ├── drift_detector.py     # Statistical KS-test sensor drift detection & synthetic shift
+│   ├── uncertainty.py        # Uncertainty quantification & human-review alerts
+│   └── main.py               # Baseline + Quantum comparison + Drift/Uncertainty demo
 ├── data/
 │   └── .gitkeep              # Data directory placeholder (cached CSV ignored by git)
 ├── tests/
-│   └── test_project.py       # Unit and integration test suite (Classical + Quantum)
+│   └── test_project.py       # Unit and integration test suite (Classical + Quantum + Drift + Uncertainty)
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # Project documentation
 └── .gitignore                # Git ignore patterns
@@ -197,23 +226,23 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-### 2. Run Both Classical & Quantum Experiments
+### 2. Run the Complete Project Pipeline
 
 Execute the main pipeline:
 ```bash
 python -m src.main
 ```
-This script will sequentially:
-1. Run the **Full Classical Baseline** across all 10,000 samples.
-2. Extract the **Stratified Quantum Subset** (80 samples).
-3. Evaluate **Classical SVM** vs. **Quantum-Kernel SVM** on the identical train/test split.
-4. Print a comparative metrics summary including training and kernel evaluation times.
+This script sequentially runs:
+1. **Full Classical Baseline:** Ingestion, preprocessing, and evaluation on all 10,000 samples.
+2. **Controlled Quantum Comparison:** Head-to-head comparison between Classical SVM and Quantum-Kernel SVM on 80 samples.
+3. **Sensor Drift Detection Demonstration:** KS-test evaluation on nominal test data vs. controlled synthetic environmental/wear drift.
+4. **Uncertainty-Aware Alert Demonstration:** Automated flagging of low-confidence predictions ($< 70\%$) for human operator inspection.
 
 ---
 
 ## 🧪 Automated Tests
 
-Execute the test suite to verify classical pipelines, leakage prevention, quantum circuit construction, angle ranges, and reproducible sampling:
+Execute the comprehensive 14-test suite covering classical pipelines, quantum circuit construction, angle ranges, drift detection edge cases, synthetic shift sensitivity, and uncertainty thresholding:
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
