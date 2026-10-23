@@ -37,7 +37,6 @@
 - [Project Structure](#-project-structure)
 - [How to Run Pipeline & Dashboard](#-how-to-run)
 - [Automated Tests](#-automated-tests)
-- [Presentation](#-presentation)
 - [License](#-license)
 
 ---
@@ -275,15 +274,6 @@ Execute the comprehensive 15-test suite covering classical pipelines, quantum ci
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
-
----
-
-## 📽️ Presentation
-
-The complete technical slide deck for our hackathon submission is available in the repository root:
-- [Download the Phantoms QFF2026 Submission Presentation](Phantoms_QFF2026_Submission.pptx)
-
-The deck covers our problem statement, leakage-free data engineering, full classical SVM baseline, 4-qubit quantum-kernel simulation, Kolmogorov–Smirnov sensor drift detector, uncertainty review layer, and live Streamlit dashboard.
 
 ---
 
