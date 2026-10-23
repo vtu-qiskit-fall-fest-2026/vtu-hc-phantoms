@@ -27,6 +27,7 @@
 
 - [Project Overview & Problem Statement](#-problem-statement)
 - [Proposed Solution & Roadmap](#-proposed-solution--roadmap)
+- [Interactive Streamlit Dashboard](#-interactive-streamlit-dashboard)
 - [Dataset Setup & Leakage Prevention](#-dataset-setup--leakage-prevention)
 - [Classical vs. Quantum Methodology](#-classical-vs-quantum-methodology)
 - [Sensor Drift Detection (Two-Sample KS Test)](#-sensor-drift-detection-two-sample-ks-test)
@@ -34,7 +35,7 @@
 - [Approach & Architecture](#-approach--architecture)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
-- [How to Run Baseline, Quantum, and Drift Demos](#-how-to-run)
+- [How to Run Pipeline & Dashboard](#-how-to-run)
 - [Automated Tests](#-automated-tests)
 - [License](#-license)
 
@@ -52,14 +53,31 @@ Industrial fault-detection systems can become unreliable when sensor readings dr
 
 ## 💡 Proposed Solution & Roadmap
 
-We investigate a hybrid quantum–classical machine learning framework that compares a classical Support Vector Machine (SVM) baseline with a simulated quantum-kernel classifier under controlled conditions. The pipeline incorporates early sensor drift warnings and uncertainty-aware alerts to flag potentially unreliable predictions for human review.
+We investigate a hybrid quantum–classical machine learning framework that compares a classical Support Vector Machine (SVM) baseline with a simulated quantum-kernel classifier under controlled conditions. The pipeline incorporates early sensor drift warnings, uncertainty-aware alerts to flag potentially unreliable predictions for human review, and an interactive monitoring dashboard.
 
 > [!NOTE]
-> **Implementation Status: Phase 4 Completed (End-to-End Pipeline)**
+> **Implementation Status: Phase 5 Completed (Full Application Stack)**
 > - [x] **Phase 1: Workspace Scaffolding**: Modular directory structure, repository config, and dependency setup.
 > - [x] **Phase 2: Data Loader & Classical Baseline**: Ingestion of UCI AI4I 2020 dataset, leakage-free preprocessing, class-imbalanced RBF-SVM training and evaluation on 10,000 samples.
 > - [x] **Phase 3: Quantum-Kernel Classifier & Head-to-Head Benchmark**: Implemented `QuantumKernelClassifier` with Qiskit `zz_feature_map` and `FidelityQuantumKernel` on `Statevector` simulation; constructed a controlled, reproducible stratified comparison benchmark.
 > - [x] **Phase 4: Drift Detection & Uncertainty Alerting**: Statistical two-sample Kolmogorov–Smirnov distribution-shift detector and uncertainty-aware human review alerting layer.
+> - [x] **Phase 5: Interactive Monitoring Dashboard**: Full-featured Streamlit dashboard ([`src/dashboard.py`](src/dashboard.py)) visualizing telemetry, live fault inference, covariate drift alerts, and model comparisons.
+
+---
+
+## 🖥️ Interactive Streamlit Dashboard
+
+The project includes an operational monitoring web dashboard built in Streamlit (`src/dashboard.py`):
+1. **Overview & Telemetry:** Ingested dataset stats, class distribution, and telemetry channel summaries.
+2. **Live Fault Prediction:** Interactive sensor sliders/presets with real-time inference, confidence metrics, and uncertainty alerts.
+3. **Sensor Drift Monitoring:** Automated two-sample KS hypothesis testing comparing baseline references against nominal or perturbed batches.
+4. **Quantum vs. Classical Benchmark:** Transparent side-by-side metric comparison, runtime documentation, and an on-demand live quantum kernel simulation runner.
+5. **Unified Alert Center:** Multi-tier triage categorizing predicted faults (Tier 1), distribution shifts (Tier 2), and borderline confidence review flags (Tier 3).
+
+Launch with:
+```bash
+streamlit run src/dashboard.py
+```
 
 ---
 
@@ -173,6 +191,10 @@ flowchart TD
         E1 --> M1["UncertaintyAlertLayer (Confidence < 70%)"]
         M1 --> N1["Human-in-the-Loop Operator Review Alert"]
     end
+
+    subgraph User Dashboard
+        E1 & K1 & M1 & I2 --> O1["Streamlit Dashboard (src/dashboard.py)"]
+    end
 ```
 
 ---
@@ -185,6 +207,7 @@ flowchart TD
 | Classical ML & Stats | `scikit-learn`, `scipy`, `numpy`, `pandas`, `matplotlib` |
 | Dataset Source | `ucimlrepo` (UCI AI4I 2020 ID: 601) |
 | Quantum SDK | `qiskit>=1.0`, `qiskit-machine-learning`, `qiskit-aer` |
+| Web Dashboard | `streamlit>=1.30` |
 | Testing | Python standard `unittest` / `pytest` |
 
 ---
@@ -200,11 +223,12 @@ Quantum/
 │   ├── quantum_model.py      # Quantum feature maps, quantum kernel, and subset extractor
 │   ├── drift_detector.py     # Statistical KS-test sensor drift detection & synthetic shift
 │   ├── uncertainty.py        # Uncertainty quantification & human-review alerts
-│   └── main.py               # Baseline + Quantum comparison + Drift/Uncertainty demo
+│   ├── dashboard.py          # Interactive Streamlit operational dashboard
+│   └── main.py               # Complete end-to-end pipeline execution
 ├── data/
 │   └── .gitkeep              # Data directory placeholder (cached CSV ignored by git)
 ├── tests/
-│   └── test_project.py       # Unit and integration test suite (Classical + Quantum + Drift + Uncertainty)
+│   └── test_project.py       # Comprehensive 15-test unit & integration suite
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # Project documentation
 └── .gitignore                # Git ignore patterns
@@ -226,23 +250,27 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-### 2. Run the Complete Project Pipeline
+### 2. Run the Main Pipeline
 
-Execute the main pipeline:
+Execute the end-to-end command-line script:
 ```bash
 python -m src.main
 ```
-This script sequentially runs:
-1. **Full Classical Baseline:** Ingestion, preprocessing, and evaluation on all 10,000 samples.
-2. **Controlled Quantum Comparison:** Head-to-head comparison between Classical SVM and Quantum-Kernel SVM on 80 samples.
-3. **Sensor Drift Detection Demonstration:** KS-test evaluation on nominal test data vs. controlled synthetic environmental/wear drift.
-4. **Uncertainty-Aware Alert Demonstration:** Automated flagging of low-confidence predictions ($< 70\%$) for human operator inspection.
+This runs the full classical baseline, the quantum kernel comparison, and the drift & uncertainty demonstration.
+
+### 3. Launch the Interactive Dashboard
+
+Launch the Streamlit monitoring interface:
+```bash
+streamlit run src/dashboard.py
+```
+Open your browser at `http://localhost:8501`.
 
 ---
 
 ## 🧪 Automated Tests
 
-Execute the comprehensive 14-test suite covering classical pipelines, quantum circuit construction, angle ranges, drift detection edge cases, synthetic shift sensitivity, and uncertainty thresholding:
+Execute the comprehensive 15-test suite covering classical pipelines, quantum circuit construction, angle ranges, drift detection edge cases, synthetic shift sensitivity, uncertainty thresholding, and dashboard evaluation helpers:
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```

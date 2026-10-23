@@ -1,5 +1,5 @@
 """
-Unit and integration tests for Phase 2, Phase 3, and Phase 4:
+Unit and integration tests for Phase 2, Phase 3, Phase 4, and Phase 5:
 - Data loader & leakage prevention
 - Classical baseline pipeline
 - Quantum feature map & kernel construction
@@ -8,6 +8,7 @@ Unit and integration tests for Phase 2, Phase 3, and Phase 4:
 - Controlled stratified sampling reproducibility
 - Statistical sensor drift detector (KS-test) & synthetic drift injection
 - Uncertainty-aware human review alerting layer
+- Dashboard helper functions (single sensor evaluation & pipeline caching)
 """
 
 import unittest
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from src.classical_model import build_preprocessor, create_classical_pipeline
+from src.dashboard import evaluate_single_sensor_reading
 from src.data_loader import (
     FEATURE_NAMES,
     LEAKAGE_TARGETS,
@@ -36,7 +38,7 @@ from src.uncertainty import UncertaintyAlertLayer
 
 
 class TestFaultDetectionProject(unittest.TestCase):
-    """Test suite covering classical baseline, quantum models, drift detection, and uncertainty."""
+    """Test suite covering classical baseline, quantum models, drift detection, uncertainty, and dashboard."""
 
     def setUp(self):
         """Generate a deterministic synthetic dataset matching the AI4I schema."""
@@ -191,7 +193,6 @@ class TestFaultDetectionProject(unittest.TestCase):
         ref = X.iloc[:50]
         test = X.iloc[50:].copy()
 
-        # Inject significant drift into Air temperature
         drifted_test = inject_synthetic_drift(test, drift_magnitudes={"Air temperature": 5.0})
 
         detector = SensorDriftDetector(alpha=0.05)
@@ -208,7 +209,6 @@ class TestFaultDetectionProject(unittest.TestCase):
         detector = SensorDriftDetector(min_samples=10)
         detector.fit_reference(ref, features=["Air temperature", "Torque"])
 
-        # Test batch smaller than min_samples with constant values
         small_test = pd.DataFrame({"Air temperature": [300.0] * 5, "Torque": [40.0] * 5})
         report = detector.detect_drift(small_test)
         self.assertIn("Air temperature", report.feature_results)
@@ -221,10 +221,10 @@ class TestFaultDetectionProject(unittest.TestCase):
         alert_layer = UncertaintyAlertLayer(confidence_threshold=0.80)
         preds = [0, 1, 0, 1]
         probs = [
-            [0.95, 0.05],  # Conf: 0.95 -> High (no alert)
-            [0.25, 0.75],  # Conf: 0.75 -> Low (< 0.80, alert)
-            [0.55, 0.45],  # Conf: 0.55 -> Low (< 0.80, alert)
-            [0.10, 0.90],  # Conf: 0.90 -> High (no alert)
+            [0.95, 0.05],
+            [0.25, 0.75],
+            [0.55, 0.45],
+            [0.10, 0.90],
         ]
 
         report = alert_layer.evaluate_predictions(preds, probabilities=probs)
@@ -240,22 +240,43 @@ class TestFaultDetectionProject(unittest.TestCase):
         """Verify handling of invalid probabilities and threshold boundary cases."""
         alert_layer = UncertaintyAlertLayer(confidence_threshold=0.70)
         preds = [0, 1, 0]
-        # Includes a malformed row with NaNs and exact boundary case 0.70
         probs = [
             [np.nan, 0.5],
-            [0.30, 0.70],  # Exactly on boundary (0.70 >= 0.70 -> no alert)
-            [0.69, 0.31],  # Just below boundary -> alert
+            [0.30, 0.70],
+            [0.69, 0.31],
         ]
 
         report = alert_layer.evaluate_predictions(preds, probabilities=probs)
 
-        # NaN confidence should be automatically flagged for human review
         self.assertTrue(report.items[0].flag_human_review)
         self.assertIn("Invalid", report.items[0].reason)
-        # Boundary 0.70 is not flagged
         self.assertFalse(report.items[1].flag_human_review)
-        # 0.69 is flagged
         self.assertTrue(report.items[2].flag_human_review)
+
+    # ----------------- Phase 5: Dashboard Helper Tests -----------------
+
+    def test_dashboard_evaluate_single_sensor_reading(self):
+        """Test the dashboard single-reading evaluation helper function."""
+        X, y = get_features_and_target(self.synthetic_df)
+        pipeline = create_classical_pipeline(svm_params={"random_state": 42})
+        pipeline.fit(X, y)
+
+        sample_reading = {
+            "Type": "L",
+            "Air temperature": 300.0,
+            "Process temperature": 310.0,
+            "Rotational speed": 1500,
+            "Torque": 40.0,
+            "Tool wear": 100,
+        }
+
+        res = evaluate_single_sensor_reading(pipeline, sample_reading, confidence_threshold=0.70)
+
+        self.assertIn(res["prediction"], [0, 1])
+        self.assertIn("prediction_label", res)
+        self.assertIn("probabilities", res)
+        self.assertGreaterEqual(res["confidence"], 0.5)
+        self.assertIsInstance(res["flag_human_review"], bool)
 
 
 if __name__ == "__main__":

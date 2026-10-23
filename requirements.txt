@@ -16,6 +16,10 @@ scipy>=1.11
 pandas>=2.1
 matplotlib>=3.8
 scikit-learn>=1.4
+ucimlrepo
+
+# Interactive Dashboard
+streamlit>=1.30
 
 # Testing
 pytest>=8.0
